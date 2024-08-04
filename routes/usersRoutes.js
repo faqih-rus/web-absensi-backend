@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const UsersModel = require("../models/users");
+const UsersModel = require("../models/usersModel");
 const bcrypt = require("bcrypt");
-// const passwordCheck = require("../utils/passwordCheck");
+const passwordCheck = require("../utils/passwordCheck");
 
 // Endpoint utama
 router.get("/", async (req, res) => {
@@ -23,6 +23,13 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { nip, nama, password, role } = req.body;
+
+    // Check if the user already exists
+    const existingUser = await UsersModel.findOne({ where: { nip } });
+    if (existingUser) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
     const encryptedPassword = await bcrypt.hash(password, 10);
 
     const user = await UsersModel.create({
@@ -41,6 +48,7 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
 
 // UPDATE DATA
 router.put("/", async (req, res) => {
@@ -72,24 +80,55 @@ router.put("/", async (req, res) => {
 
 // LOGIN
 router.post("/login", async (req, res) => {
+  console.log("Login attempt received:", req.body);
   try {
     const { nip, password } = req.body;
-    const check = await passwordCheck(nip, password);
-    if (check.compare === true) {
-      res.status(200).json({
-        users: check.userData,
-        metadata: "Login success",
-      });
-    } else {
-      res.status(401).json({
-        error: "Unauthorized",
+
+    if (!nip || !password) {
+      console.log("Missing NIP or password");
+      return res.status(400).json({
+        error: "NIP and password are required",
       });
     }
+
+    const user = await UsersModel.findOne({ where: { nip } });
+
+    if (!user) {
+      console.log("User not found:", nip);
+      return res.status(401).json({
+        error: "User not found",
+      });
+    }
+
+    console.log("User found:", user.nip);
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      console.log("Invalid password for user:", nip);
+      return res.status(401).json({
+        error: "Invalid password",
+      });
+    }
+
+    console.log("Login successful for user:", nip);
+    res.status(200).json({
+      users: {
+        nip: user.nip,
+        nama: user.nama,
+        role: user.role,
+      },
+      metadata: "Login success",
+    });
   } catch (error) {
-    res.status(400).json({
-      error: "Data invalid",
+    console.error("Login error:", error);
+    res.status(500).json({
+      error: "Internal server error",
     });
   }
 });
+
+
+router.post("/logout")
 
 module.exports = router;

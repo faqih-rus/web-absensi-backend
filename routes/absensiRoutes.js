@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const AbsensiModel = require("../models/absensi");
+const AbsensiModel = require("../models/absensiModel.js");
 
 // Endpoint utama
 router.get("/", async (req, res) => {
@@ -49,4 +49,5 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
+router.post 
 module.exports = router;
