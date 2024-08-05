@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const AbsensiModel = require("../models/absensiModel.js");
+const authenticateToken = require("../middleware/auth");
 
-// Endpoint utama
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const absensi = await AbsensiModel.findAll();
     res.status(200).json({
@@ -16,7 +16,7 @@ router.get("/", async (req, res) => {
 });
 
 // Check-in
-router.post("/checkin", async (req, res) => {
+router.post("/checkin", authenticateToken, async (req, res) => {
   try {
     const { nip } = req.body;
     const absensi = await AbsensiModel.create({
@@ -33,7 +33,7 @@ router.post("/checkin", async (req, res) => {
 });
 
 // Check-out
-router.post("/checkout", async (req, res) => {
+router.post("/checkout", authenticateToken, async (req, res) => {
   try {
     const { nip } = req.body;
     const absensi = await AbsensiModel.create({
@@ -49,5 +49,4 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
-router.post 
 module.exports = router;

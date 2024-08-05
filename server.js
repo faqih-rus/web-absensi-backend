@@ -1,24 +1,28 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql2");
-const port = 3001;
+const port = 8000;
 
-//database
+// Database
 const sequelize = require("./db.config");
-sequelize.sync().then(() => console.log("database ready"));
+sequelize.sync().then(() => console.log("Database ready")).catch((err) => console.error("Unable to connect to the database:", err));
 
-//endpoint
+// Endpoint
 const userEndpoint = require("./routes/usersRoutes");
 const absensiEndpoint = require("./routes/absensiRoutes");
 
-//inisialisasi express
+// Inisialisasi express
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000', 
+  methods: 'GET,POST,PUT,DELETE',
+  allowedHeaders: 'Content-Type,Authorization',
+}));
 app.use(express.json());
 
 app.use("/users", userEndpoint);
 app.use("/absensi", absensiEndpoint);
 
 app.listen(port, () => {
-  console.log(`running server on port ${port}`);
+  console.log(`Running server on port ${port}`);
 });

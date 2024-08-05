@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const UsersModel = require("../models/usersModel");
 const bcrypt = require("bcrypt");
-const passwordCheck = require("../utils/passwordCheck");
+const jwt = require("jsonwebtoken");
 
 // Endpoint utama
 router.get("/", async (req, res) => {
@@ -12,9 +12,10 @@ router.get("/", async (req, res) => {
       data: users,
       metadata: "Users Endpoint",
     });
-  } catch (error) {
+  } catch (e) {
+    console.error("Error fetching users:", e);
     res.status(500).json({
-      error: "Internal Server Error",
+      error: e.message,
     });
   }
 });
@@ -23,112 +24,99 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { nip, nama, password, role } = req.body;
-
-    // Check if the user already exists
+    const encryptedPassword = await bcrypt.hash(password, 10);
     const existingUser = await UsersModel.findOne({ where: { nip } });
     if (existingUser) {
       return res.status(400).json({ error: "User already exists" });
     }
-
-    const encryptedPassword = await bcrypt.hash(password, 10);
-
-    const user = await UsersModel.create({
+    const users = await UsersModel.create({
       nip,
       nama,
       password: encryptedPassword,
       role,
     });
     res.status(200).json({
-      registered: user,
+      registered: users,
       metadata: "Add data berhasil",
     });
-  } catch (error) {
+  } catch (e) {
+    console.error("Error adding user:", e);
     res.status(400).json({
       error: "Data invalid",
     });
   }
 });
-
 
 // UPDATE DATA
 router.put("/", async (req, res) => {
+  const { nip, nama, password, passwordBaru } = req.body;
+
   try {
-    const { nip, nama, password, passwordBaru } = req.body;
-    const check = await passwordCheck(nip, password);
-    const encryptedPassword = await bcrypt.hash(passwordBaru, 10);
-
-    if (check.compare === true) {
-      const [updated] = await UsersModel.update(
-        { nama, password: encryptedPassword },
-        { where: { nip: nip } }
-      );
-      res.status(200).json({
-        users: { updated },
-        metadata: "User data updated",
-      });
-    } else {
-      res.status(401).json({
-        error: "Unauthorized",
-      });
-    }
-  } catch (error) {
-    res.status(400).json({
-      error: "Data invalid",
-    });
-  }
-});
-
-// LOGIN
-router.post("/login", async (req, res) => {
-  console.log("Login attempt received:", req.body);
-  try {
-    const { nip, password } = req.body;
-
-    if (!nip || !password) {
-      console.log("Missing NIP or password");
-      return res.status(400).json({
-        error: "NIP and password are required",
-      });
-    }
-
     const user = await UsersModel.findOne({ where: { nip } });
-
     if (!user) {
-      console.log("User not found:", nip);
       return res.status(401).json({
         error: "User not found",
       });
     }
 
-    console.log("User found:", user.nip);
-
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
-      console.log("Invalid password for user:", nip);
       return res.status(401).json({
         error: "Invalid password",
       });
     }
 
-    console.log("Login successful for user:", nip);
-    res.status(200).json({
-      users: {
-        nip: user.nip,
-        nama: user.nama,
-        role: user.role,
+    const encryptedPassword = await bcrypt.hash(passwordBaru, 10);
+    const [updated] = await UsersModel.update(
+      {
+        nama,
+        password: encryptedPassword,
       },
-      metadata: "Login success",
+      { where: { nip: nip } }
+    );
+    res.status(200).json({
+      users: { updated },
+      metadata: "User data updated",
     });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({
-      error: "Internal server error",
+  } catch (e) {
+    console.error("Error updating user:", e);
+    res.status(400).json({
+      error: "Data invalid",
     });
   }
 });
 
+router.post("/login", async (req, res) => {
+  try {
+    const { nip, password } = req.body;
+    const user = await UsersModel.findOne({ where: { nip } });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-router.post("/logout")
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+    
+    const token = jwt.sign(
+      { nip: user.nip, nama: user.nama, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+    res.status(200).json({
+      user: {
+        nip: user.nip,
+        nama: user.nama,
+        role: user.role,
+      },
+      token,
+      metadata: "Login successful",
+    });
+  } catch (e) {
+    console.error("Error during login:", e);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 module.exports = router;
